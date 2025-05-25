@@ -1,15 +1,123 @@
 #include <stdio.h>
-int board[9][9] = {
-    {0, 0, 0, 0, 0, 0, 0, 9, 0},
-    {1, 9, 0, 4, 7, 0, 6, 0, 8},
-    {0, 5, 2, 8, 1, 9, 4, 0, 7},
-    {2, 0, 0, 0, 4, 8, 0, 0, 0},
-    {0, 0, 9, 0, 0, 0, 5, 0, 0},
-    {0, 0, 0, 7, 5, 0, 0, 0, 9},
-    {9, 0, 7, 3, 6, 4, 1, 8, 0},
-    {5, 0, 6, 0, 8, 1, 0, 7, 4},
-    {0, 8, 0, 0, 0, 0, 0, 0, 0}
-};
+#include <stdlib.h>
+#include <time.h>
+#define MAX_PROBLEMS 500
+
+
+
+
+
+
+// 檢查在某格填某個數是否合法
+int is_safe(int board[9][9], int row, int col, int num) {
+    for (int x = 0; x < 9; x++) {
+        if (board[row][x] == num || board[x][col] == num ||
+            board[row - row % 3 + x / 3][col - col % 3 + x % 3] == num)
+            return 0;
+    }
+    return 1;
+}
+
+// 用回溯法產生完整合法數獨解
+int fill_board(int board[9][9], int row, int col) {
+    if (row == 9) return 1;
+    if (col == 9) return fill_board(board, row + 1, 0);
+    if (board[row][col] != 0) return fill_board(board, row, col + 1);
+
+    int numbers[9] = {1,2,3,4,5,6,7,8,9};
+    // 打亂數字順序
+    for (int i = 8; i > 0; i--) {
+        int j = rand() % (i + 1);
+        int temp = numbers[i];
+        numbers[i] = numbers[j];
+        numbers[j] = temp;
+    }
+
+    for (int i = 0; i < 9; i++) {
+        int num = numbers[i];
+        if (is_safe(board, row, col, num)) {
+            board[row][col] = num;
+            if (fill_board(board, row, col + 1)) return 1;
+            board[row][col] = 0;
+        }
+    }
+    return 0;
+}
+
+int solve_sudoku(int board[9][9], int count_limit, int* solution_count) {
+    if (*solution_count > count_limit) return 0;
+
+    for (int row = 0; row < 9; row++) {
+        for (int col = 0; col < 9; col++) {
+            if (board[row][col] == 0) {
+                for (int num = 1; num <= 9; num++) {
+                    if (is_safe(board, row, col, num)) {
+                        board[row][col] = num;
+                        solve_sudoku(board, count_limit, solution_count);
+                        board[row][col] = 0;
+                    }
+                }
+                return 0; // 回溯
+            }
+        }
+    }
+
+    (*solution_count)++; // 找到一組解
+    return 1;
+}
+
+int has_unique_solution(int board[9][9]) {
+    int temp[9][9];
+    for (int i = 0; i < 9; i++)
+        for (int j = 0; j < 9; j++)
+            temp[i][j] = board[i][j];
+
+    int solution_count = 0;
+    solve_sudoku(temp, 1, &solution_count);
+    return solution_count == 1;
+}
+
+void remove_cells_unique(int board[9][9], int num_holes) {
+    int attempts = 0;
+    int removed = 0;
+
+    while (removed < num_holes && attempts < 1000) {
+        int row = rand() % 9;
+        int col = rand() % 9;
+
+        if (board[row][col] != 0) {
+            int backup = board[row][col];
+            board[row][col] = 0;
+
+            if (has_unique_solution(board)) {
+                removed++;
+            } else {
+                board[row][col] = backup; // 還原
+            }
+            attempts++;
+        }
+    }
+
+    if (removed < num_holes) {
+        printf("⚠️ 僅能安全挖掉 %d 格（要求 %d 格）\n", removed, num_holes);
+    }
+}
+
+void generate_random_sudoku_unique(int board[9][9], int num_holes) {
+    int full[9][9] = {0};
+    fill_board(full, 0, 0);
+
+    for (int i = 0; i < 9; i++)
+        for (int j = 0; j < 9; j++)
+            board[i][j] = full[i][j];
+
+    remove_cells_unique(board, num_holes);
+}
+
+
+
+
+
 
 typedef struct {
     int numbers;   // 檔案中的問題總數
@@ -22,34 +130,44 @@ typedef struct {
 } SudokuProblem;
 int problem_id = 1; // 問題編號
 void save_to_binary_file(int board[][9], int problem_id, const char* filename, int is_append); // Function prototype
-void save_to_text_file(int board[][9], const char* filename); // Function prototype
 void print_board(int board[][9]); // Function prototype
 
-int main()
-{
+int main() {
+    srand(time(NULL));
+    int puzzle[9][9] = {0};
+    int level, holes;
 
-    // 儲存到文本檔案
-    save_to_text_file(board, "sudoku.txt");
+    printf("請選擇難度（1: 容易, 2: 中等, 3: 困難, 4: 專家, 5: 極限, 6: 題庫）: ");
+    scanf("%d", &level);
 
-    // 讀取文本檔案
-    int new_board[9][9] = {0};
-    if (read_from_text_file(new_board, "sudoku.txt")) {
-        printf("\n從文本檔案讀取的數獨盤面：\n");
-        print_board(new_board);
-    }
-
-    // 儲存到二進位檔案
-    save_to_binary_file(board, problem_id, "sudoku.bin", 0);
-
-    // 讀取二進位檔案
-    int binary_board[9][9] = {0};
-    if (read_from_binary_file(binary_board, "sudoku.bin", 0)) {
-        printf("\n從二進位檔案讀取的數獨盤面：\n");
-        print_board(binary_board);
-    }
-
-    return 0;
+    switch(level) {
+        case 1: holes = 35; break;
+        case 2: holes = 45; break;
+        case 3: holes = 50; break;
+        case 4: holes = 54; break;
+        case 5: holes = 57; break;
+        case 6: if (level == 6) {
+                    int nunber;
+                    printf("請輸入要選擇的題號: ");
+                    scanf("%d",  &nunber);
+                    int board[9][9] = {0};
+                    if (read_from_binary_file(board, "sudoku.bin", nunber -1)) {
+                        printf("\n第 %d 題：\n", nunber);
+                        print_board(board);
+                    } else {
+                        printf("無法讀取題目\n");
+                    }
+                break;
+            default: holes = 45;
+            }
+        }
+        if (level != 6){
+            generate_random_sudoku_unique(puzzle, holes);
+            print_board(puzzle);
+        }
+    
 }
+
 void print_board(int board[][9]) {
     int i, j;
     printf("\n +-------+-------+-------+\n");
@@ -68,66 +186,6 @@ void print_board(int board[][9]) {
         if (i % 3 == 2) printf(" +-------+-------+-------+\n");
     }
 }
-
-// Function to save Sudoku board to a text file
-void save_to_text_file(int board[][9], const char* filename) {
-    FILE *fp = fopen(filename, "w");
-    if (fp == NULL) {
-        printf("無法開啟檔案 %s 進行寫入\n", filename);
-        return;
-    }
-
-    for (int i = 0; i < 9; i++) {
-        for (int j = 0; j < 9; j++) {
-            if (board[i][j] == 0) {
-                fprintf(fp, ".");  // 使用點表示空格
-            } else {
-                fprintf(fp, "%d", board[i][j]);
-            }
-        }
-        fprintf(fp, "\n");  // 每行結束換行
-    }
-
-    fclose(fp);
-    printf("已成功儲存到 %s\n", filename);
-}
-
-// Function to read Sudoku board from a text file
-int read_from_text_file(int board[][9], const char* filename) {
-    FILE *fp = fopen(filename, "r");
-    if (fp == NULL) {
-        printf("無法開啟檔案 %s 進行讀取\n", filename);
-        return 0;
-    }
-
-    char line[20];  // 足夠容納一行的緩衝區
-    int row = 0;
-
-    while (row < 9 && fgets(line, sizeof(line), fp) != NULL) {
-        for (int col = 0; col < 9; col++) {
-            if (line[col] == '.') {
-                board[row][col] = 0;  // 空格
-            } else if (line[col] >= '1' && line[col] <= '9') {
-                board[row][col] = line[col] - '0';  // 轉換字元到數字
-            } else {
-                continue;  // 忽略其他字元（如換行）
-            }
-        }
-        row++;
-    }
-
-    fclose(fp);
-
-    if (row < 9) {
-        printf("警告：檔案格式不正確或檔案不完整\n");
-        return 0;
-    }
-
-    printf("已成功從 %s 讀取數獨盤面\n", filename);
-    return 1;
-}
-
-
 
 
 void save_to_binary_file(int board[][9], int problem_id, const char* filename, int is_append) {
@@ -152,7 +210,18 @@ void save_to_binary_file(int board[][9], int problem_id, const char* filename, i
             // 檔案存在，更新標頭中的問題數量
             SudokuDataHeader header;
             fread(&header, sizeof(header), 1, fp);
+
+            if (header.numbers >= MAX_PROBLEMS) {
+                printf("⚠️ 題庫已達上限（最多 %d 題）\n", MAX_PROBLEMS);
+                fclose(fp);
+                return;
+            }
+
+
+            // 自動設定新的題目 ID 為目前數量 + 1
+            problem_id = header.numbers + 1;
             header.numbers++;
+
 
             // 回到檔案開頭更新標頭
             fseek(fp, 0, SEEK_SET);
@@ -188,8 +257,6 @@ void save_to_binary_file(int board[][9], int problem_id, const char* filename, i
 
     fwrite(&problem, sizeof(problem), 1, fp);
     fclose(fp);
-
-    printf("已成功儲存到二進位檔案 %s\n", filename);
 }
 
 // Function to save Sudoku board to a binary file
@@ -204,7 +271,7 @@ int read_from_binary_file(int board[][9], const char* filename, int problem_inde
     SudokuDataHeader header;
     fread(&header, sizeof(header), 1, fp);
 
-    printf("檔案中有 %d 個數獨問題\n", header.numbers);
+    printf("檔案中有 %d 個數獨問題\n", header.numbers-1);
 
     if (problem_index < 0 || problem_index >= header.numbers) {
         printf("問題編號 %d 超出範圍 (0-%d)\n", problem_index, header.numbers - 1);
@@ -225,9 +292,7 @@ int read_from_binary_file(int board[][9], const char* filename, int problem_inde
             board[i][j] = problem.data[i][j];
         }
     }
-
-    printf("已讀取問題 ID: %d\n", problem.id);
     fclose(fp);
 
     return 1;
-}
+    }
