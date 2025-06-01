@@ -2,7 +2,13 @@
 #include <stdlib.h>
 #include <time.h>
 #define MAX_PROBLEMS 500
-
+int nunber;
+// ========== 新增區塊：遊戲用全域變數 ==========
+// 說明：增加遊戲所需的基本變數
+int player_board[9][9];     // 玩家當前的盤面
+int answer_board[9][9];     // 正確答案盤面
+int original_board[9][9];   // 原始問題盤面
+int error_count = 0;        // 錯誤計數
 
 
 
@@ -98,9 +104,6 @@ void remove_cells_unique(int board[9][9], int num_holes) {
         }
     }
 
-    if (removed < num_holes) {
-        printf("⚠️ 僅能安全挖掉 %d 格（要求 %d 格）\n", removed, num_holes);
-    }
 }
 
 void generate_random_sudoku_unique(int board[9][9], int num_holes) {
@@ -131,42 +134,6 @@ typedef struct {
 int problem_id = 1; // 問題編號
 void save_to_binary_file(int board[][9], int problem_id, const char* filename, int is_append); // Function prototype
 void print_board(int board[][9]); // Function prototype
-
-int main() {
-    srand(time(NULL));
-    int puzzle[9][9] = {0};
-    int level, holes;
-
-    printf("請選擇難度（1: 容易, 2: 中等, 3: 困難, 4: 專家, 5: 極限, 6: 題庫）: ");
-    scanf("%d", &level);
-
-    switch(level) {
-        case 1: holes = 35; break;
-        case 2: holes = 45; break;
-        case 3: holes = 50; break;
-        case 4: holes = 54; break;
-        case 5: holes = 57; break;
-        case 6: if (level == 6) {
-                    int nunber;
-                    printf("請輸入要選擇的題號: ");
-                    scanf("%d",  &nunber);
-                    int board[9][9] = {0};
-                    if (read_from_binary_file(board, "sudoku.bin", nunber -1)) {
-                        printf("\n第 %d 題：\n", nunber);
-                        print_board(board);
-                    } else {
-                        printf("無法讀取題目\n");
-                    }
-                break;
-            default: holes = 45;
-            }
-        }
-        if (level != 6){
-            generate_random_sudoku_unique(puzzle, holes);
-            print_board(puzzle);
-        }
-    
-}
 
 void print_board(int board[][9]) {
     int i, j;
@@ -271,7 +238,7 @@ int read_from_binary_file(int board[][9], const char* filename, int problem_inde
     SudokuDataHeader header;
     fread(&header, sizeof(header), 1, fp);
 
-    printf("檔案中有 %d 個數獨問題\n", header.numbers-1);
+    printf("檔案中有 %d 個數獨問題\n", header.numbers);
 
     if (problem_index < 0 || problem_index >= header.numbers) {
         printf("問題編號 %d 超出範圍 (0-%d)\n", problem_index, header.numbers - 1);
@@ -296,3 +263,125 @@ int read_from_binary_file(int board[][9], const char* filename, int problem_inde
 
     return 1;
     }
+
+
+int main() {
+    remove("sudoku.bin");
+    srand(time(NULL));
+    int puzzle[9][9] = {0};
+    int level, holes;
+    int i=1, x=0;
+
+    printf("請選擇難度（1: 容易, 2: 中等, 3: 困難, 4: 專家, 5:題庫）: ");
+    scanf("%d", &level);
+    for (int a = 0; a < 100; a++) {
+        int puzzle[9][9];
+        generate_random_sudoku_unique(puzzle, 35);
+        save_to_binary_file(puzzle, i + 1, "sudoku.bin", i > 0); // 第一次 is_append=0，其餘為 1
+    }
+    for (int a = 0; a < 100; a++) {
+        int puzzle[9][9];
+        generate_random_sudoku_unique(puzzle, 45);
+        save_to_binary_file(puzzle, i + 1, "sudoku.bin", i > 0); // 第一次 is_append=0，其餘為 1
+    }
+
+    for (int a = 0; a < 100; a++) {
+        int puzzle[9][9];
+        generate_random_sudoku_unique(puzzle, 50);
+        save_to_binary_file(puzzle, i + 1, "sudoku.bin", i > 0); // 第一次 is_append=0，其餘為 1
+        }
+    for (int a = 0; a < 100; a++) {
+        int puzzle[9][9];
+        generate_random_sudoku_unique(puzzle, 54);
+        save_to_binary_file(puzzle, i + 1, "sudoku.bin", i > 0); // 第一次 is_append=0，其餘為 1
+    }
+
+    switch(level) {
+        case 1: holes = 35; break;
+        case 2: holes = 45; break;
+        case 3: holes = 50; break;
+        case 4: holes = 54; break;
+        case 5: if (level == 5) {
+                    printf("1到100容易\n101到200中等\n201到300困難\n301到400專家\n為請輸入要選擇的題號: ");
+                    scanf("%d",  &nunber);
+                    int board[9][9] = {0};
+                    if (read_from_binary_file(board, "sudoku.bin", nunber -1)) {
+                        printf("\n第 %d 題：\n", nunber);
+                        print_board(board);
+                        int loaded_board[9][9] = {0}; //初始化一個新的數獨盤
+                        read_from_binary_file(loaded_board, "sudoku.bin", nunber-1);
+                        solve(loaded_board, 0);
+                        printf("解答後的數獨健:\n");
+                        print_board(loaded_board);
+                    } else {
+                        printf("無法讀取題目\n");
+                    }
+                break;
+            default: holes = 45;
+            }
+        }
+        if (level != 5){
+            generate_random_sudoku_unique(puzzle, holes);
+            print_board(puzzle);
+        solve(puzzle, 0);
+        printf("解答後的數獨健:\n");
+        print_board(puzzle);
+        }
+        return 0;
+    
+}
+
+int solve(int puzzle[][9], int pos) {
+    // 終止條件：所有位置都填完了
+    if (pos == 81) {
+        return 1;  // 成功解出
+    }
+
+    // 將位置編號轉換為行列座標
+    int row = pos / 9;
+    int col = pos % 9;
+
+    // 如果該位置已有數字，跳到下一個位置
+    if (puzzle[row][col] != 0) {
+        return solve(puzzle, pos + 1);
+    }
+
+    // 嘗試填入數字 1-9
+    for (int num = 1; num <= 9; num++) {
+        // 檢查這個數字是否可以放在這個位置
+        if (isValid(num, puzzle, row, col)) {
+            // 暫時填入這個數字
+            puzzle[row][col] = num;
+
+            // 遞迴處理下一個位置
+            if (solve(puzzle, pos + 1)) {
+                return 1;  // 成功找到解答
+            }
+
+            // 如果遞迴失敗，回溯：清空該格
+            puzzle[row][col] = 0;
+        }
+    }
+
+    // 所有數字都試過，仍無法解出
+    return 0;
+}
+
+
+int isValid(int number, int puzzle[][9], int row, int col) {
+    int rowStart = (row / 3) * 3;
+    int colStart = (col / 3) * 3;
+
+    for (int i = 0; i < 9; i++) {
+        // 檢查同一行
+        if (puzzle[row][i] == number) return 0;
+
+        // 檢查同一列
+        if (puzzle[i][col] == number) return 0;
+
+        // 檢查 3x3 小方格
+        if (puzzle[rowStart + (i / 3)][colStart + (i % 3)] == number) return 0;
+    }
+
+    return 1;
+}
