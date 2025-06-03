@@ -13,7 +13,6 @@ int error_count = 0;        // 錯誤計數
 
 
 
-
 // 檢查在某格填某個數是否合法
 int is_safe(int board[9][9], int row, int col, int num) {
     for (int x = 0; x < 9; x++) {
@@ -83,6 +82,171 @@ int has_unique_solution(int board[9][9]) {
     return solution_count == 1;
 }
 
+int solve(int puzzle[][9], int pos) {
+    // 終止條件：所有位置都填完了
+    if (pos == 81) {
+        return 1;  // 成功解出
+    }
+
+    // 將位置編號轉換為行列座標
+    int row = pos / 9;
+    int col = pos % 9;
+
+    // 如果該位置已有數字，跳到下一個位置
+    if (puzzle[row][col] != 0) {
+        return solve(puzzle, pos + 1);
+    }
+
+    // 嘗試填入數字 1-9
+    for (int num = 1; num <= 9; num++) {
+        // 檢查這個數字是否可以放在這個位置
+        if (isValid(num, puzzle, row, col)) {
+            // 暫時填入這個數字
+            puzzle[row][col] = num;
+
+            // 遞迴處理下一個位置
+            if (solve(puzzle, pos + 1)) {
+                return 1;  // 成功找到解答
+            }
+
+            // 如果遞迴失敗，回溯：清空該格
+            puzzle[row][col] = 0;
+        }
+    }
+
+    // 所有數字都試過，仍無法解出
+    return 0;
+}
+
+
+int isValid(int number, int puzzle[][9], int row, int col) {
+    int rowStart = (row / 3) * 3;
+    int colStart = (col / 3) * 3;
+
+    for (int i = 0; i < 9; i++) {
+        // 檢查同一行
+        if (puzzle[row][i] == number) return 0;
+
+        // 檢查同一列
+        if (puzzle[i][col] == number) return 0;
+
+        // 檢查 3x3 小方格
+        if (puzzle[rowStart + (i / 3)][colStart + (i % 3)] == number) return 0;
+    }
+
+    return 1;
+}
+
+// ========== 新增區塊：提示功能 ==========
+// 說明：為玩家提供一個正確答案的提示
+void give_hint() {
+    // 收集所有空的位置
+    int empty_positions[81][2];
+    int empty_count = 0;
+    
+    for (int i = 0; i < 9; i++) {
+        for (int j = 0; j < 9; j++) {
+            if (player_board[i][j] == 0) {
+                empty_positions[empty_count][0] = i;
+                empty_positions[empty_count][1] = j;
+                empty_count++;
+            }
+        }
+    }
+    
+    if (empty_count == 0) {
+        printf("已經沒有空格了！\n");
+        return;
+    }
+    
+    // 隨機選擇一個空位置給提示
+    int random_index = rand() % empty_count;
+    int hint_row = empty_positions[random_index][0];
+    int hint_col = empty_positions[random_index][1];
+    
+    // 填入正確答案
+    player_board[hint_row][hint_col] = answer_board[hint_row][hint_col];
+    
+    printf("💡 提示：第 %d 列第 %d 行應該填 %d\n", 
+           hint_row + 1, hint_col + 1, answer_board[hint_row][hint_col]);
+}
+
+// ========== 新增區塊：輸入處理函式 ==========
+// 說明：處理玩家輸入並檢查答案
+int handle_input() {
+    int row, col, num;
+
+    printf("請輸入 行 列 數字 (1-9)，或輸入 0 0 0 結束遊戲，輸入 -1 -1 -1 獲得提示: ");
+    scanf("%d %d %d", &row, &col, &num);
+
+    // 檢查是否要結束遊戲
+    if (row == 0 && col == 0 && num == 0) {
+        return -1; // 結束遊戲
+    }
+    
+    // 檢查是否要獲得提示
+    if (row == -1 && col == -1 && num == -1) {
+        give_hint();
+        return 1; // 繼續遊戲並顯示盤面
+    }
+
+    // 檢查輸入範圍
+    if (row < 1 || row > 9 || col < 1 || col > 9 || num < 1 || num > 9) {
+        printf("輸入超出範圍！請輸入 1-9 之間的數字。\n");
+        return 0; // 繼續遊戲
+    }
+
+    // 轉換為陣列索引 (0-8)
+    row--; col--;
+
+    // 檢查該位置是否為原始數字
+    if (original_board[row][col] != 0) {
+        printf("該位置是原始數字，不能修改！\n");
+        return 0;
+    }
+
+    // 檢查該位置是否已經填過
+    if (player_board[row][col] != 0) {
+        printf("該位置已經填過數字了！\n");
+        return 0;
+    }
+
+    // 檢查答案是否正確
+    if (answer_board[row][col] == num) {
+        // 正確
+        player_board[row][col] = num;
+        printf("正確！\n");
+        return 1;
+    } else {
+        // 錯誤
+        error_count++;
+        printf("錯誤！錯誤次數：%d\n", 
+error_count);
+        return 1;
+    }
+}
+// ========== 新增區塊：遊戲完成檢查 ==========
+// 說明：檢查是否完成遊戲
+int is_complete() {
+    for (int i = 0; i < 9; i++) {
+        for (int j = 0; j < 9; j++) {
+            if (player_board[i][j] == 0) {
+                return 0; // 還有空格
+            }
+        }
+    }
+    return 1; // 完成
+}
+
+int file_exists(const char *filename) {
+    FILE *file = fopen(filename, "rb");
+    if (file) {
+        fclose(file);
+        return 1;
+    }
+    return 0;
+}
+
 void remove_cells_unique(int board[9][9], int num_holes) {
     int attempts = 0;
     int removed = 0;
@@ -116,11 +280,6 @@ void generate_random_sudoku_unique(int board[9][9], int num_holes) {
 
     remove_cells_unique(board, num_holes);
 }
-
-
-
-
-
 
 typedef struct {
     int numbers;   // 檔案中的問題總數
@@ -264,38 +423,105 @@ int read_from_binary_file(int board[][9], const char* filename, int problem_inde
     return 1;
     }
 
+// ========== 新增區塊：遊戲初始化函式 ==========
+// 說明：準備遊戲所需的盤面和答案
+void init_game(int puzzle[][9]) {
+    // 複製原始問題到各個盤面
+    for (int i = 0; i < 9; i++) {
+        for (int j = 0; j < 9; j++) {
+            original_board[i][j] = puzzle[i][j];
+            player_board[i][j] = puzzle[i][j];
+            answer_board[i][j] = puzzle[i][j];
+        }
+    }
+
+    // 計算正確答案
+    solve(answer_board, 0);
+
+    // 重置錯誤計數
+    error_count = 0;
+
+    printf("遊戲初始化完成！\n");
+}
+
+// ========== 新增區塊：遊戲主函式 ==========
+// 說明：遊戲的主要控制邏輯
+void play_game(int puzzle[][9]) {
+    printf("=== 數獨遊戲 ===\n");
+    printf("規則：輸入 列(橫) 行(直) 數字 來填數字\n");
+    printf("輸入 -1 -1 -1 可以獲得提示\n");
+    printf("錯誤5次遊戲結束\n\n");
+
+    // 初始化遊戲
+    init_game(puzzle);
+
+    // 顯示初始盤面
+    printf("初始盤面：\n");
+    print_board(puzzle);
+
+    // 遊戲主迴圈
+    while (error_count < 5) {
+        int result = handle_input();
+
+        if (result == -1) {
+            printf("遊戲結束！\n");
+            break;
+        }
+
+        if (result == 1) {
+            // 顯示當前盤面
+            printf("\n當前盤面：\n");
+            print_board(player_board);
+
+            // 檢查是否完成
+            if (is_complete()) {
+                printf("🎉 恭喜！你完成了數獨！\n");
+                break;
+            }
+        }
+    }
+
+    // 遊戲結束處理
+    if (error_count >= 5) {
+        printf("💥 錯誤太多次，遊戲結束！\n");
+        printf("正確答案：\n");
+        print_board(answer_board);
+    }
+}
+
 
 int main() {
-    remove("sudoku.bin");
     srand(time(NULL));
     int puzzle[9][9] = {0};
     int level, holes;
     int i=1, x=0;
+    const char *filename = "sudoku.bin";
 
     printf("請選擇難度（1: 容易, 2: 中等, 3: 困難, 4: 專家, 5:題庫）: ");
     scanf("%d", &level);
-    for (int a = 0; a < 100; a++) {
-        int puzzle[9][9];
-        generate_random_sudoku_unique(puzzle, 35);
-        save_to_binary_file(puzzle, i + 1, "sudoku.bin", i > 0); // 第一次 is_append=0，其餘為 1
-    }
-    for (int a = 0; a < 100; a++) {
-        int puzzle[9][9];
-        generate_random_sudoku_unique(puzzle, 45);
-        save_to_binary_file(puzzle, i + 1, "sudoku.bin", i > 0); // 第一次 is_append=0，其餘為 1
-    }
-
-    for (int a = 0; a < 100; a++) {
-        int puzzle[9][9];
-        generate_random_sudoku_unique(puzzle, 50);
-        save_to_binary_file(puzzle, i + 1, "sudoku.bin", i > 0); // 第一次 is_append=0，其餘為 1
+    if (!file_exists(filename)) {
+        for (int a = 0; a < 100; a++) {
+            int puzzle[9][9];
+            generate_random_sudoku_unique(puzzle, 35);
+            save_to_binary_file(puzzle, i + 1, "sudoku.bin", i > 0); // 第一次 is_append=0，其餘為 1
         }
-    for (int a = 0; a < 100; a++) {
-        int puzzle[9][9];
-        generate_random_sudoku_unique(puzzle, 54);
-        save_to_binary_file(puzzle, i + 1, "sudoku.bin", i > 0); // 第一次 is_append=0，其餘為 1
-    }
+        for (int a = 0; a < 100; a++) {
+            int puzzle[9][9];
+            generate_random_sudoku_unique(puzzle, 45);
+            save_to_binary_file(puzzle, i + 1, "sudoku.bin", i > 0); // 第一次 is_append=0，其餘為 1
+        }
 
+        for (int a = 0; a < 100; a++) {
+            int puzzle[9][9];
+            generate_random_sudoku_unique(puzzle, 50);
+            save_to_binary_file(puzzle, i + 1, "sudoku.bin", i > 0); // 第一次 is_append=0，其餘為 1
+            }
+        for (int a = 0; a < 100; a++) {
+            int puzzle[9][9];
+            generate_random_sudoku_unique(puzzle, 54);
+            save_to_binary_file(puzzle, i + 1, "sudoku.bin", i > 0); // 第一次 is_append=0，其餘為 1
+        }
+    }   
     switch(level) {
         case 1: holes = 35; break;
         case 2: holes = 45; break;
@@ -308,11 +534,7 @@ int main() {
                     if (read_from_binary_file(board, "sudoku.bin", nunber -1)) {
                         printf("\n第 %d 題：\n", nunber);
                         print_board(board);
-                        int loaded_board[9][9] = {0}; //初始化一個新的數獨盤
-                        read_from_binary_file(loaded_board, "sudoku.bin", nunber-1);
-                        solve(loaded_board, 0);
-                        printf("解答後的數獨健:\n");
-                        print_board(loaded_board);
+                        play_game(board);
                     } else {
                         printf("無法讀取題目\n");
                     }
@@ -322,66 +544,11 @@ int main() {
         }
         if (level != 5){
             generate_random_sudoku_unique(puzzle, holes);
-            print_board(puzzle);
-        solve(puzzle, 0);
-        printf("解答後的數獨健:\n");
-        print_board(puzzle);
+            play_game(puzzle);
         }
         return 0;
     
 }
 
-int solve(int puzzle[][9], int pos) {
-    // 終止條件：所有位置都填完了
-    if (pos == 81) {
-        return 1;  // 成功解出
-    }
-
-    // 將位置編號轉換為行列座標
-    int row = pos / 9;
-    int col = pos % 9;
-
-    // 如果該位置已有數字，跳到下一個位置
-    if (puzzle[row][col] != 0) {
-        return solve(puzzle, pos + 1);
-    }
-
-    // 嘗試填入數字 1-9
-    for (int num = 1; num <= 9; num++) {
-        // 檢查這個數字是否可以放在這個位置
-        if (isValid(num, puzzle, row, col)) {
-            // 暫時填入這個數字
-            puzzle[row][col] = num;
-
-            // 遞迴處理下一個位置
-            if (solve(puzzle, pos + 1)) {
-                return 1;  // 成功找到解答
-            }
-
-            // 如果遞迴失敗，回溯：清空該格
-            puzzle[row][col] = 0;
-        }
-    }
-
-    // 所有數字都試過，仍無法解出
-    return 0;
-}
 
 
-int isValid(int number, int puzzle[][9], int row, int col) {
-    int rowStart = (row / 3) * 3;
-    int colStart = (col / 3) * 3;
-
-    for (int i = 0; i < 9; i++) {
-        // 檢查同一行
-        if (puzzle[row][i] == number) return 0;
-
-        // 檢查同一列
-        if (puzzle[i][col] == number) return 0;
-
-        // 檢查 3x3 小方格
-        if (puzzle[rowStart + (i / 3)][colStart + (i % 3)] == number) return 0;
-    }
-
-    return 1;
-}
